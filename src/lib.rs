@@ -85,6 +85,21 @@ impl<T> LazyCell<T> {
         unsafe { &*self.inner.get() }.as_ref()
     }
 
+    /// Borrows the contents of this lazy cell for the duration of the cell
+    /// itself
+    /// 
+    /// If the underlying value of the cell has not yet been realized, the
+    /// cell is first filled using the function provided.
+    pub fn borrow_with<F: FnOnce() -> T>(&self, f: F) -> &T {
+        let mut slot = unsafe {&mut *self.inner.get() };
+        if slot.is_some() {
+            return slot.as_ref().unwrap()
+        }
+
+        *slot = Some(f());
+        slot.as_ref().unwrap()
+    }
+
     /// Consumes this `LazyCell`, returning the underlying value.
     pub fn into_inner(self) -> Option<T> {
         unsafe { self.inner.into_inner() }
@@ -184,6 +199,14 @@ mod tests {
 
         lazycell.fill(1).unwrap();
         assert_eq!(lazycell.fill(1), Err(1));
+    }
+
+    #[test]
+    fn test_borrow_with() {
+        let lazycell = LazyCell::new();
+
+        let value = lazycell.borrow_with(|| 1);
+        assert_eq!(&1, value);
     }
 
     #[test]
